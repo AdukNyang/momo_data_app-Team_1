@@ -35,7 +35,7 @@ Once the data is stored, the app shows it on a simple web dashboard where users 
 
 The diagram below shows how data flows through the system: from the raw `momo.xml` file, through the Python ETL pipeline, into the SQLite database, and finally to the dashboard the user sees in their browser.
 
-![System Architecture Diagram](Docs/System Architecture.png)
+![System Architecture Diagram](./Docs/System%20Architecture.png)
 
 
 ---
