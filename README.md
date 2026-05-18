@@ -28,10 +28,8 @@ The diagram below shows how data flows through the system: from the raw `momo.xm
 
 ![System Architecture](docs/System%20Architecture.png)
 
-## Database Design
-We designed the database around six entities: **Transactions**, **Users**, **Transaction_Categories**, **Transaction_Users** (a junction table that resolves the many-to-many relationship between transactions and the people involved in them), **System_Logs**, and **System_Messages** (a separate table for OTP and system messages, which do not carry financial information).
+![System Architecture Diagram](./Docs/System%20Architecture.png)
 
-The full ERD is shown below, and the complete Database Design Document — including the data dictionary, design rationale, security rules, and CRUD test results — is available in the `docs/` folder.
 
 ![MoMo SMS Database ERD](docs/MoMo%20SMS%20Database%20ERD.png)
 
@@ -49,12 +47,10 @@ momo_data_app-Team_1/
 │   │   └── momo.xml
 │   └── processed/
 │       └── dashboard.json
-├── database/
-│   └── database_setup.sql
-├── docs/
-│   ├── MoMo SMS Database ERD.png
-│   ├── MoMo_SMS_Database_Design_Document.pdf
-│   ├── Picture_Evidence.jpeg
+├── Docs/
+│   └── MOMo SMS Database ERD.png
+│   └── MoMo_SMS_Database_Design_Document.pdf
+│   └── Picture_Evidence.jpeg
 │   └── System Architecture.png
 ├── etl/
 │   ├── __init__.py
@@ -76,7 +72,8 @@ momo_data_app-Team_1/
 │   └── test_categorize.py
 └── web/
     ├── styles.css
-    └── chart_handler.js
+    ├── chart_handler.js
+    └── assets/
 ```
 
 ## Project Management
