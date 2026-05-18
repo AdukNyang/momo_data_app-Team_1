@@ -1,54 +1,58 @@
 {
-  "transaction_category": {
-    "category_id": 1,
-    "name": "P2P Transfer",
-    "type": "debit",
-    "direction": "OUT"
+  "entities": {
 
-  },
-  "user": {
-    "user_id": 1,
-    "name": "Ayo Mensah",
-    "phone_full": "+250781234567",
-    "phone_masked": "+25078***567",
-    "user_type": "personal",
-    "account_number": "ACC100001"
-  },
+    "transaction_category": {
+      "category_id": 1,
+      "name": "P2P Transfer",
+      "type": "debit",
+      "direction": "OUT"
+    },
 
-  "transaction": {
-    "transaction_id": 1,
-    "transaction_date": 1714500000,
-    "occurred_at": "2024-04-30 10:00:00",
-    "amount": 5000.00,
-    "fee": 50.00,
-    "new_balance": 45000.00,
-    "category_id": 1,
-    "sender_message": "Lunch money",
-    "token": "TKN-0001",
-    "external_txn_id": "EXT-AA001",
-    "body_raw": "TxId AA001 confirmed. RWF 5000 sent to Joy Uwase."
-  },
+    "user": {
+      "user_id": 1,
+      "name": "Ayo Mensah",
+      "phone_full": "+250781234567",
+      "phone_masked": "+25078***567",
+      "user_type": "personal",
+      "account_number": "ACC100001"
+    },
 
-  "transaction_users": {
-    "transaction_id": 1,
-    "user_id": 1,
-    "role": "sender"
-  },
+    "transaction": {
+      "transaction_id": 1,
+      "transaction_date": 1714500000,
+      "occurred_at": "2024-04-30 10:00:00",
+      "amount": 5000.00,
+      "fee": 50.00,
+      "new_balance": 45000.00,
+      "category_id": 1,
+      "sender_message": "Lunch money",
+      "token": "TKN-0001",
+      "external_txn_id": "EXT-AA001",
+      "body_raw": "TxId AA001 confirmed. RWF 5000 sent to Joy Uwase."
+    },
 
-  "system_log": {
-    "log_id": 1,
-    "timestamp": "2024-04-30 10:00:05",
-    "level": "INFO",
-    "message": "Transaction parsed successfully.",
-    "record_reference": "TKN-0001",
-    "transaction_id": 1
-  },
+    "transaction_users": {
+      "transaction_id": 1,
+      "user_id": 1,
+      "role": "sender"
+    },
 
-  "system_message": {
-    "received_at": 1714499990,
-    "otp_code": null,
-    "full_text": "TxId AA001 confirmed. RWF 5000 sent to Joy Uwase. New balance: RWF 45000.",
-    "user_id": 1
+    "system_log": {
+      "log_id": 1,
+      "timestamp": "2024-04-30 10:00:05",
+      "level": "INFO",
+      "message": "Transaction parsed successfully.",
+      "record_reference": "TKN-0001",
+      "transaction_id": 1
+    },
+
+    "system_message": {
+      "received_at": 1714499990,
+      "otp_code": null,
+      "full_text": "TxId AA001 confirmed. RWF 5000 sent to Joy Uwase. New balance: RWF 45000.",
+      "user_id": 1
+    }
+
   },
 
   "complete_transaction": {
@@ -62,14 +66,14 @@
 
     "category": {
       "category_id": 1,
-      "name":"P2P Transfer",
+      "name": "P2P Transfer",
       "type": "debit",
       "direction": "OUT"
     },
 
     "sender": {
       "user_id": 1,
-      "name":"Ayo Mensah",
+      "name": "Ayo Mensah",
       "phone_masked": "+25078***567",
       "user_type": "personal"
     },
@@ -85,7 +89,7 @@
       "log_id": 1,
       "level": "INFO",
       "message": "Transaction parsed successfully.",
-      "timestamp":"2024-04-30 10:00:05"
+      "timestamp": "2024-04-30 10:00:05"
     }
   }
 }

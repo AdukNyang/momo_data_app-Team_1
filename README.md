@@ -36,15 +36,14 @@ Once the data is stored, the app shows it on a simple web dashboard where users 
 
 The diagram below shows how data flows through the system: from the raw `momo.xml` file, through the Python ETL pipeline, into the SQLite database, and finally to the dashboard the user sees in their browser.
 
-![System Architecture Diagram](./Docs/System%20Architecture.png)
-
+![System Architecture Diagram](./docs/System%20Architecture.png)
 
 ---
 
 ## Project Structure
 
 ```
-app-Team-1/
+momo_data_app-Team_1/
 ├── README.md
 ├── .env.example
 ├── .gitignore
@@ -53,10 +52,17 @@ app-Team-1/
 ├── data/
 │   ├── raw/
 │   │   └── momo.xml
-│   └── processed/
-│       └── dashboard.json
-├── Docs/
+│   ├── processed/
+│   │   └── dashboard.json
+│   └── logs/
+│       ├── etl.log
+│       └── dead_letter/
+├── database/
+│   └── database_setup.sql
+├── docs/
 │   └── System Architecture.png
+├── examples/
+│   └── json_schemas.json
 ├── etl/
 │   ├── __init__.py
 │   ├── config.py
@@ -75,7 +81,8 @@ app-Team-1/
 │   └── test_categorize.py
 └── web/
     ├── styles.css
-    └── chart_handler.js
+    ├── chart_handler.js
+    └── assets/
 ```
 
 
