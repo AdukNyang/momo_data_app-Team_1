@@ -51,7 +51,7 @@ momo_data_app-Team_1/
 ├── index.html
 ├── data/
 │   ├── raw/
-│   │   └── momo.xml
+│   │   └── .gitkeep
 │   ├── processed/
 │   │   └── dashboard.json
 │   └── logs/
@@ -61,6 +61,9 @@ momo_data_app-Team_1/
 │   └── database_setup.sql
 ├── docs/
 │   └── System Architecture.png
+│   └── MoMo SMS Database ERD.png
+│   └── MoMo_SMS_Database_Design_Document.pdf
+│   └── Picture_Evidence.jpeg
 ├── examples/
 │   └── json_schemas.json
 ├── etl/
