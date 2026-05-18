@@ -9,7 +9,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Transaction_Categories comes first because Transactions depends on it
 CREATE TABLE IF NOT EXISTS Transaction_Categories (
     category_id   INT          NOT NULL AUTO_INCREMENT COMMENT 'category primary key',
-    name          VARCHAR(50)  NOT NULL                COMMENT 'e.g. P2P Transfer, Merchant Payment',
+    name          VARCHAR(50)  NOT NULL                COMMENT 'e.g. MoMo to MoMo Transfer, Agent Payment',
     type          VARCHAR(50)  NOT NULL                COMMENT 'debit or credit',
     direction     VARCHAR(3)   NOT NULL                COMMENT 'IN or OUT',
 
@@ -33,11 +33,11 @@ CREATE TABLE IF NOT EXISTS Users (
 );
 
 
--- used transaction_id as PK instead of transaction_date
+-- used transaction_id as PK instead of transaction_date because:
 -- transaction_date alone is not safe as a PK since two transactions can happen at the same timestamp
 CREATE TABLE IF NOT EXISTS Transactions (
-    transaction_id   INT           NOT NULL AUTO_INCREMENT COMMENT 'surrogate primary key',
-    transaction_date BIGINT        NOT NULL               COMMENT 'unix timestamp from SMS metadata',
+    transaction_id   INT           NOT NULL AUTO_INCREMENT COMMENT 'our surrogate primary key',
+    transaction_date BIGINT        NOT NULL               COMMENT 'unix timestamp from our SMS metadata',
     occurred_at      DATETIME      NOT NULL               COMMENT 'when the transaction happened',
     amount           DECIMAL(10,2) NOT NULL               COMMENT 'amount in RWF',
     fee              DECIMAL(10,2) NOT NULL DEFAULT 0.00  COMMENT 'transaction fee',

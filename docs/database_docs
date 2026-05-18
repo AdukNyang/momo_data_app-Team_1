@@ -1,0 +1,263 @@
+# MoMo SMS Database — Documentation
+
+**Assignment:** Week 2 SQL Implementation  
+**File:** `scripts/database_setup.sql`
+
+---
+
+## 1. Overview
+
+This document covers the database we designed for the MoMo SMS data processing system. The goal was to take the ERD from Week 1 and turn it into an actual working MySQL database — with proper constraints, indexes, and test data.
+
+The database stores mobile money transactions parsed from SMS messages. It needs to handle different transaction types, track which users were involved in each transaction, and keep a log of what happened during processing.
+
+---
+
+## 2. Design Decisions
+
+### Why we changed the Primary Key on Transactions
+
+The ERD had `transaction_date` as the primary key for the Transactions table. We changed this to a dedicated `transaction_id` column instead.
+
+The issue with using `transaction_date` is that it's a Unix timestamp — if two transactions happen at the exact same second, they'd have the same value and one would get rejected. That's a real risk in a mobile money system where batch payments happen. Using `transaction_id INT AUTO_INCREMENT` avoids this completely. `transaction_date` is still in the table, just as a regular column.
+
+---
+
+### How the junction table works
+
+`Transaction_Users` sits between `Transactions` and `Users` to handle the many-to-many relationship. A single transaction can involve multiple people — for example a cash withdrawal involves the user sending money and an agent facilitating it. And one user can appear in hundreds of transactions over time.
+
+The table stores one row per pairing, with a `role` column to say whether that person was the sender, receiver, or agent. The primary key is a combination of `(transaction_id, user_id, role)` so the same person can't be listed twice in the same role for the same transaction.
+
+---
+
+### Connecting System_Logs and System_Messages
+
+In the original ERD these two tables had no relationships — they were just floating. We added:
+
+- A `transaction_id` FK in `System_Logs` so each log entry can be linked to the transaction it's about. This is important for debugging — when something fails you need to know which transaction caused it. It's nullable so general system logs that aren't about a specific transaction still work.
+
+- A `user_id` FK in `System_Messages` to link each raw SMS to the user it came from. This gives us traceability from the raw message all the way to the parsed transaction.
+
+---
+
+### Data type choices
+
+| Column | Type | Why |
+|--------|------|-----|
+| amount, fee, new_balance | DECIMAL(10,2) | Financial values — FLOAT would cause rounding errors |
+| transaction_date, received_at | BIGINT | Storing Unix timestamps as integers, matches SMS metadata format |
+| occurred_at, timestamp | DATETIME | Readable format for querying and reporting |
+| body_raw, full_text, message | TEXT | SMS content can be long, VARCHAR(255) would cut it off |
+| direction | VARCHAR(3) | Only ever IN or OUT |
+| phone_full | VARCHAR(15) | Handles international format like +250781234567 |
+
+---
+
+### CHECK constraints
+
+These enforce business rules at the database level so bad data can never get in regardless of what the application does.
+
+| Table | Constraint | Rule |
+|-------|-----------|------|
+| Transaction_Categories | chk_direction | direction must be IN or OUT |
+| Transaction_Categories | chk_type | type must be debit or credit |
+| Users | chk_user_type | user_type must be personal, merchant or agent |
+| Transactions | chk_amount | amount must be greater than 0 |
+| Transactions | chk_fee | fee must be 0 or more |
+| Transactions | chk_new_balance | balance must be 0 or more |
+| Transaction_Users | chk_role | role must be sender, receiver or agent |
+| System_Logs | chk_log_level | level must be INFO, WARN or ERROR |
+
+---
+
+### Indexes
+
+We added indexes on columns that would commonly appear in WHERE clauses or JOINs.
+
+| Index | Column | Why |
+|-------|--------|-----|
+| idx_transactions_occurred_at | occurred_at | filtering by date range |
+| idx_transactions_category | category_id | joining with Transaction_Categories |
+| idx_transactions_token | token | checking for duplicate transactions |
+| idx_txn_users_user | user_id | finding all transactions for a user |
+| idx_system_logs_level | level | filtering by ERROR or WARN |
+| idx_system_logs_timestamp | timestamp | time-range queries on logs |
+| idx_system_logs_txn | transaction_id | finding logs for a transaction |
+| idx_users_phone | phone_full | looking up users by phone number |
+| idx_users_type | user_type | filtering by merchants or agents |
+| idx_sysmsg_user | user_id | finding messages for a user |
+
+---
+
+## 3. CRUD Operation Results
+
+All queries below were run after inserting the sample data.
+![Database Diagram](Picture_Evidence.jpeg)
+---
+
+### INSERT — sample data loaded
+
+| Table | Rows inserted |
+|-------|--------------|
+| Transaction_Categories | 7 |
+| Users | 6 |
+| Transactions | 6 |
+| Transaction_Users | 10 |
+| System_Logs | 6 |
+| System_Messages | 6 |
+
+---
+
+### SELECT — all transactions with category
+
+```sql
+SELECT t.transaction_id, t.occurred_at, t.amount, t.fee, t.new_balance,
+       c.name AS category, c.direction
+FROM Transactions t
+JOIN Transaction_Categories c ON t.category_id = c.category_id
+ORDER BY t.occurred_at;
+```
+
+| transaction_id | occurred_at | amount | fee | new_balance | category | direction |
+|---|---|---|---|---|---|---|
+| 1 | 2024-04-30 10:00:00 | 5000.00 | 50.00 | 45000.00 | P2P Transfer | OUT |
+| 2 | 2024-04-30 11:00:00 | 20000.00 | 100.00 | 80000.00 | P2P Receive | IN |
+| 3 | 2024-04-30 12:00:00 | 3500.00 | 35.00 | 76500.00 | Merchant Payment | OUT |
+| 4 | 2024-04-30 13:00:00 | 1000.00 | 10.00 | 75500.00 | Airtime Purchase | OUT |
+| 5 | 2024-04-30 14:00:00 | 50000.00 | 200.00 | 25500.00 | Cash Withdrawal | OUT |
+| 6 | 2024-04-30 15:00:00 | 10000.00 | 0.00 | 35500.00 | Bank Deposit | IN |
+
+---
+
+### SELECT — who was involved in each transaction
+
+```sql
+SELECT tu.transaction_id, u.name, u.phone_full, tu.role, t.amount, t.occurred_at
+FROM Transaction_Users tu
+JOIN Users u ON tu.user_id = u.user_id
+JOIN Transactions t ON tu.transaction_id = t.transaction_id
+ORDER BY tu.transaction_id, tu.role;
+```
+
+| transaction_id | name | phone_full | role | amount | occurred_at |
+|---|---|---|---|---|---|
+| 1 | Ayo Mensah | +250781234567 | sender | 5000.00 | 2024-04-30 10:00:00 |
+| 1 | Joy Uwase | +250789876543 | receiver | 5000.00 | 2024-04-30 10:00:00 |
+| 2 | Joy Uwase | +250789876543 | sender | 20000.00 | 2024-04-30 11:00:00 |
+| 2 | Ayo Mensah | +250781234567 | receiver | 20000.00 | 2024-04-30 11:00:00 |
+| 3 | Diane Ishimwe | +250756789012 | sender | 3500.00 | 2024-04-30 12:00:00 |
+| 3 | Keza Mutoni | +250722345678 | receiver | 3500.00 | 2024-04-30 12:00:00 |
+| 4 | Diane Ishimwe | +250756789012 | sender | 1000.00 | 2024-04-30 13:00:00 |
+| 5 | Eric Nkurunziza | +250768901234 | sender | 50000.00 | 2024-04-30 14:00:00 |
+| 5 | Claude Habimana | +250733456789 | agent | 50000.00 | 2024-04-30 14:00:00 |
+| 6 | Ayo Mensah | +250781234567 | receiver | 10000.00 | 2024-04-30 15:00:00 |
+
+---
+
+### SELECT — error logs only
+
+```sql
+SELECT * FROM System_Logs WHERE level = 'ERROR';
+```
+
+| log_id | timestamp | level | message | record_reference | transaction_id |
+|---|---|---|---|---|---|
+| 6 | 2024-04-30 15:05:00 | ERROR | Failed to parse SMS - unknown format. | NULL | NULL |
+
+---
+
+### UPDATE — fix account number
+
+```sql
+UPDATE Users SET account_number = 'ACC200001' WHERE phone_full = '+250781234567';
+```
+
+Result: 1 row affected
+
+Verification:
+
+```sql
+SELECT user_id, name, account_number FROM Users WHERE phone_full = '+250781234567';
+```
+
+| user_id | name | account_number |
+|---|---|---|
+| 1 | Ayo Mensah | ACC200001 |
+
+---
+
+### UPDATE — correct a transaction fee
+
+```sql
+UPDATE Transactions SET fee = 60.00 WHERE transaction_id = 1;
+```
+
+Result: 1 row affected
+
+Verification:
+
+```sql
+SELECT transaction_id, amount, fee FROM Transactions WHERE transaction_id = 1;
+```
+
+| transaction_id | amount | fee |
+|---|---|---|
+| 1 | 5000.00 | 60.00 |
+
+---
+
+### DELETE — remove a WARN log
+
+```sql
+DELETE FROM System_Logs WHERE level = 'WARN' AND transaction_id = 4;
+```
+
+Result: 1 row affected
+
+Remaining logs after deletion:
+
+| log_id | timestamp | level | message | record_reference | transaction_id |
+|---|---|---|---|---|---|
+| 1 | 2024-04-30 10:00:05 | INFO | Transaction parsed successfully. | TKN-0001 | 1 |
+| 2 | 2024-04-30 11:00:08 | INFO | Transaction parsed successfully. | TKN-0002 | 2 |
+| 3 | 2024-04-30 12:00:03 | INFO | Transaction parsed successfully. | TKN-0003 | 3 |
+| 5 | 2024-04-30 14:00:11 | INFO | Agent withdrawal logged. | TKN-0005 | 5 |
+| 6 | 2024-04-30 15:05:00 | ERROR | Failed to parse SMS - unknown format. | NULL | NULL |
+
+Log entry 4 is gone. The rest are intact.
+
+---
+
+## 4. Referential Integrity Tests
+
+These confirm the foreign key and CHECK constraints actually block bad data.
+
+**Test 1 — insert a transaction with a category that doesn't exist:**
+```sql
+INSERT INTO Transactions (..., category_id, ...) VALUES (..., 99, ...);
+-- ERROR 1452: Cannot add or update a child row: a foreign key constraint fails
+```
+
+**Test 2 — insert a Transaction_Users row with a user that doesn't exist:**
+```sql
+INSERT INTO Transaction_Users (transaction_id, user_id, role) VALUES (1, 999, 'sender');
+-- ERROR 1452: Cannot add or update a child row: a foreign key constraint fails
+```
+
+**Test 3 — insert a category with an invalid direction:**
+```sql
+INSERT INTO Transaction_Categories (name, type, direction) VALUES ('Test', 'debit', 'BOTH');
+-- ERROR 3819: Check constraint 'chk_direction' is violated
+```
+
+All three constraints are working correctly.
+
+---
+
+## 5. File locations
+
+```
+scripts/database_setup.sql     the SQL implementation
+Docs/database_documentation.md this file
+```
