@@ -56,6 +56,9 @@ app-Team-1/
 │   └── processed/
 │       └── dashboard.json
 ├── Docs/
+│   └── MOMo SMS Database ERD.png
+│   └── MoMo_SMS_Database_Design_Document.pdf
+│   └── Picture_Evidence.jpeg
 │   └── System Architecture.png
 ├── etl/
 │   ├── __init__.py
