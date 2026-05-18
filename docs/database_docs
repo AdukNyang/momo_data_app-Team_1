@@ -1,7 +1,7 @@
 # MoMo SMS Database — Documentation
 
 **Assignment:** Week 2 SQL Implementation  
-**File:** `scripts/database_setup.sql`
+**File:** `database/database_setup.sql`
 
 ---
 
@@ -258,6 +258,6 @@ All three constraints are working correctly.
 ## 5. File locations
 
 ```
-scripts/database_setup.sql     the SQL implementation
+database/database_setup.sql     the SQL implementation
 Docs/database_documentation.md this file
 ```
