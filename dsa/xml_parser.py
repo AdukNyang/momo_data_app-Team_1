@@ -1,667 +1,236 @@
-# ============================================
-# IMPORTS
-# ============================================
+"""
+XML Parser for MoMo SMS data.
 
-# ElementTree helps us read and navigate XML files
-# This is Python's built-in XML parser
+Reads the raw SMS XML file, extracts the useful fields from each message
+(amount, fee, sender, receiver, category, etc.), masks sensitive identifiers,
+and returns everything as a dictionary keyed by transaction_id.
+"""
+
 import xml.etree.ElementTree as ET
-
-# re stands for Regular Expressions
-# It helps us search and extract patterns from text
 import re
-
-# json helps us export Python dictionaries
-# into real JSON files
 import json
-
-# datetime helps us convert timestamps
-# into real human readable dates
+import os
 from datetime import datetime
 
 
-# ============================================
-# HELPER FUNCTION:
-# CONVERT XML TIMESTAMPS INTO REAL DATES
-# ============================================
+# ---------- Project paths ----------
+# Build paths relative to THIS file, so the parser works no matter where
+# you run it from. __file__ is the full path to xml_parser.py itself.
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))           # .../dsa
+PROJECT_ROOT = os.path.dirname(THIS_DIR)                        # project root
+DEFAULT_XML_PATH = os.path.join(PROJECT_ROOT, "data", "raw", "modified_sms_v2.xml")
+DEFAULT_JSON_OUTPUT = os.path.join(THIS_DIR, "parsed_transactions.json")
+
+
+# ---------- Helpers ----------
 
 def format_timestamp(timestamp_ms):
+    """Convert milliseconds (as stored in the XML) into a readable date string."""
+    seconds = int(timestamp_ms) / 1000
+    return datetime.fromtimestamp(seconds).strftime("%Y-%m-%d %H:%M:%S")
 
-    """
-    This function converts XML time stamps which are store in miliseconds, to a real Python date
-    We divide by 1000 becuase python datetime expects seconds yet its miliseconds. 
-
-    """
-
-    # Convert milliseconds into seconds
-    timestamp_seconds = int(timestamp_ms) / 1000
-
-    # Convert into Python datetime object
-    dt = datetime.fromtimestamp(timestamp_seconds)
-
-    # Return readable date format
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
-# ============================================
-# HELPER FUNCTION:
-# MASK PHONE NUMBERS
-# ============================================
 
 def mask_phone_number(phone):
-
-    """
-    This function masks real phone numbers
-    for security purposes e.g 250791666666 to 2507******66
-
-    """
-
-    # Convert phone number into string so that we can easily manipulate the content
+    """Hide the middle of a phone number. e.g. 250791666666 -> 250******666"""
     phone = str(phone)
-
-    # Get the first 3 digits
     start = phone[:3]
-
-    # Get the last 3 digits
     end = phone[-3:]
-
-    # Calculate how many characters to hide
-    hidden_length = len(phone) - 6
-
-    # Create hidden stars
-    hidden = "*" * hidden_length
-
-    # Combine all parts together
+    hidden = "*" * (len(phone) - 6)
     return start + hidden + end
 
 
-# ============================================
-# HELPER FUNCTION:
-# MASK ACCOUNT NUMBERS
-# ============================================
-
 def mask_account_number(account):
-
-    """
-    This function helps to mask bank account numbers, which are one of the most sensitive pieces of information. 
-    Example:
-    36521838 -> *****838
-
-    """
-
-    # Convert into string
+    """Hide everything but the last 3 digits of an account number."""
     account = str(account)
-
-    # Last 3 digits
     visible = account[-3:]
-
-    # Calculate hidden section
-    hidden_length = len(account) - 3
-
-    # Create stars
-    hidden = "*" * hidden_length
-
-    # Combine hidden and visible
+    hidden = "*" * (len(account) - 3)
     return hidden + visible
 
 
-# ============================================
-# HELPER FUNCTION:
-# PROCESS IDENTIFIERS
-# ============================================
-
 def process_identifier(identifier_type, raw_value):
-
-    """
-    This function helps identify if a person is using the phone number, account number, or momo_code, which later helps in giving more details about the user
-    """
-
-    # Phone numbers
+    """Wrap an identifier (phone, account, momo code) in a consistent dict."""
     if identifier_type == "phone":
+        return {"type": "phone", "value": mask_phone_number(raw_value)}
+    if identifier_type == "account_number":
+        return {"type": "account_number", "value": mask_account_number(raw_value)}
+    if identifier_type == "momo_code":
+        return {"type": "momo_code", "value": raw_value}
+    if identifier_type == "masked_phone":
+        return {"type": "phone", "value": raw_value}
+    return {"type": "unknown", "value": None}
 
-        return {
-            "type": "phone",
-            "value": mask_phone_number(raw_value)
-        }
-
-    # Bank account numbers
-    elif identifier_type == "account_number":
-
-        return {
-            "type": "account_number",
-            "value": mask_account_number(raw_value)
-        }
-
-    # MoMo codes
-    elif identifier_type == "momo_code":
-
-        return {
-            "type": "momo_code",
-            "value": raw_value
-        }
-
-    # Already masked numbers
-    elif identifier_type == "masked_phone":
-
-        return {
-            "type": "phone",
-            "value": raw_value
-        }
-
-    # Unknown identifiers
-    return {
-        "type": "unknown",
-        "value": None
-    }
-
-
-# ============================================
-# HELPER FUNCTION:
-# EXTRACT MONEY VALUES
-# ============================================
 
 def extract_money(pattern, text):
-
-    """
-    This function gets amounts from raw long texts using regular expressions, then turns them into real numbers
-    Example: "20,000" to 20000.0
-
-    """
-
-    # Search for pattern
+    """Pull a money amount out of the SMS text using a regex pattern."""
     match = re.search(pattern, text)
-
-    # If value found
     if match:
-
-        # Extract amount
-        amount = match.group(1)
-
-        # Remove commas
-        amount = amount.replace(",", "")
-
-        # Convert into float
+        amount = match.group(1).replace(",", "")
         return float(amount)
-
     return 0.0
 
 
-# ============================================
-# HELPER FUNCTION:
-# EXTRACT FINANCIAL TRANSACTION ID
-# ============================================
-
 def extract_financial_id(body):
-
-    """
-    Extract transaction IDs from SMS.
-    This works for both TxId and Financial Transaction Id:
-    """
-
-    match = re.search(
-        r'(?:TxId:|Financial Transaction Id:)\s*([0-9]+)',
-        body
-    )
-
+    """Find the TxId or Financial Transaction Id inside an SMS body."""
+    match = re.search(r'(?:TxId:|Financial Transaction Id:)\s*([0-9]+)', body)
     if match:
         return match.group(1)
-
     return None
 
 
-# ============================================
-# HELPER FUNCTION:
-# DETECT TRANSACTION CATEGORY
-# ============================================
-
 def detect_category(body):
-
-    """
-    Detect transaction type using SMS keywords.
-    """
-
+    """Figure out what kind of transaction this SMS is describing."""
     body_lower = body.lower()
 
-    # Incoming money
     if "received" in body_lower:
+        return {"name": "Incoming Money", "type": "credit", "direction": "IN"}
+    if "payment" in body_lower:
+        return {"name": "Merchant Payment", "type": "debit", "direction": "OUT"}
+    if "transferred to" in body_lower:
+        return {"name": "Money Transfer", "type": "debit", "direction": "OUT"}
+    if "bank deposit" in body_lower:
+        return {"name": "Bank Deposit", "type": "credit", "direction": "IN"}
+    if "airtime" in body_lower:
+        return {"name": "Airtime Purchase", "type": "debit", "direction": "OUT"}
 
-        return {
-            "name": "Incoming Money",
-            "type": "credit",
-            "direction": "IN"
-        }
+    return {"name": "Unknown", "type": "unknown", "direction": "UNK"}
 
-    # Merchant payments
-    elif "payment" in body_lower:
-
-        return {
-            "name": "Merchant Payment",
-            "type": "debit",
-            "direction": "OUT"
-        }
-
-    # Transfers
-    elif "transferred to" in body_lower:
-
-        return {
-            "name": "Money Transfer",
-            "type": "debit",
-            "direction": "OUT"
-        }
-
-    # Bank deposits
-    elif "bank deposit" in body_lower:
-
-        return {
-            "name": "Bank Deposit",
-            "type": "credit",
-            "direction": "IN"
-        }
-
-    # Airtime payments
-    elif "airtime" in body_lower:
-
-        return {
-            "name": "Airtime Purchase",
-            "type": "debit",
-            "direction": "OUT"
-        }
-
-    # Unknown category
-    return {
-        "name": "Unknown",
-        "type": "unknown",
-        "direction": "UNK"
-    }
-
-
-# ============================================
-# HELPER FUNCTION:
-# EXTRACT IDENTIFIERS
-# ============================================
 
 def extract_identifier(text):
-
-    """
-    This function extracts and classifys identifiers like sender, reciever, with their important data e.g phone numbers, account numbers, and momo codes, and sensitive data is maseked for security purposes
-    
-    """
-
-    # ========================================
-    # MASKED PHONE NUMBER
-    # Example: (*********013)
-    # ========================================
-
-    masked_phone = re.search(
-        r'\((\*{5,}\d{3})\)',
-        text
-    )
-
+    """Find a sender/receiver identifier in the SMS text and classify it."""
+    masked_phone = re.search(r'\((\*{5,}\d{3})\)', text)
     if masked_phone:
+        return process_identifier("masked_phone", masked_phone.group(1))
 
-        raw_value = masked_phone.group(1)
-
-        return process_identifier(
-            "masked_phone",
-            raw_value
-        )
-
-    # ========================================
-    # REAL PHONE NUMBER
-    # Example: (250791666666)
-    # ========================================
-
-    real_phone = re.search(
-        r'\((2507\d{8})\)',
-        text
-    )
-
+    real_phone = re.search(r'\((2507\d{8})\)', text)
     if real_phone:
+        return process_identifier("phone", real_phone.group(1))
 
-        raw_value = real_phone.group(1)
-
-        return process_identifier(
-            "phone",
-            raw_value
-        )
-
-    # ========================================
-    # MOMO CODE
-    # Example:Jane Smith "12845"
-    # ========================================
-
-    momo_code = re.search(
-        r'to\s+[A-Za-z\s]+\s+(\d{5})',
-        text
-    )
-
+    momo_code = re.search(r'to\s+[A-Za-z\s]+\s+(\d{5})', text)
     if momo_code:
+        return process_identifier("momo_code", momo_code.group(1))
 
-        raw_value = momo_code.group(1)
-
-        return process_identifier(
-            "momo_code",
-            raw_value
-        )
-
-    # ========================================
-    # ACCOUNT NUMBER
-    # Example: from 36521838
-    # ========================================
-
-    account_number = re.search(
-        r'from\s+(\d{8,})',
-        text
-    )
-
+    account_number = re.search(r'from\s+(\d{8,})', text)
     if account_number:
+        return process_identifier("account_number", account_number.group(1))
 
-        raw_value = account_number.group(1)
+    return {"type": None, "value": None}
 
-        return process_identifier(
-            "account_number",
-            raw_value
-        )
-
-    # If nothing found
-    return {
-        "type": None,
-        "value": None
-    }
-
-
-# ============================================
-# HELPER FUNCTION:
-# EXTRACT SENDER INFORMATION
-# ============================================
 
 def extract_sender(body):
+    """Pull out who sent the money from the SMS body."""
+    sender = {"name": None, "identifier": {"type": None, "value": None}}
 
-    """
-    Extract sender information from different SMS formats.
-    """
-
-    # Initial sender
-    sender = {
-        "name": None,
-        "identifier": {
-            "type": None,
-            "value": None
-        }
-    }
-
-    # ========================================
-    # RECEIVED MONEY FORMAT
-    # Example: from Jane Smith (*********013)
-    # ========================================
-
-    received_match = re.search(
-        r'from\s+([A-Za-z\s]+)\s+\(',
-        body
-    )
-
+    received_match = re.search(r'from\s+([A-Za-z\s]+)\s+\(', body)
     if received_match:
-
         sender["name"] = received_match.group(1).strip()
-
         sender["identifier"] = extract_identifier(body)
-
         return sender
 
-    # ========================================
-    # ACCOUNT TRANSFER FORMAT
-    # Example: from 36521838
-    # ========================================
-
-    account_match = re.search(
-        r'from\s+(\d{8,})',
-        body
-    )
-
+    account_match = re.search(r'from\s+(\d{8,})', body)
     if account_match:
-
         sender["name"] = "Account Transfer"
-
         sender["identifier"] = extract_identifier(body)
-
         return sender
 
     return sender
 
 
-# ============================================
-# HELPER FUNCTION:
-# EXTRACT RECEIVER INFORMATION
-# ============================================
-
 def extract_receiver(body):
+    """Pull out who received the money from the SMS body."""
+    receiver = {"name": None, "identifier": {"type": None, "value": None}}
 
-    """
-    Extract receiver information from different sms messages
-
-    """
-
-    # initial reciever
-    receiver = {
-        "name": None,
-        "identifier": {
-            "type": None,
-            "value": None
-        }
-    }
-
-    # ========================================
-    # TRANSFER FORMAT
-    # Example: transferred to Samuel Carter (250791666666)
-    # ========================================
-
-    transfer_match = re.search(
-        r'transferred to\s+([A-Za-z\s]+)\s+\(',
-        body
-    )
-
+    transfer_match = re.search(r'transferred to\s+([A-Za-z\s]+)\s+\(', body)
     if transfer_match:
-
         receiver["name"] = transfer_match.group(1).strip()
-
         receiver["identifier"] = extract_identifier(body)
-
         return receiver
 
-    # ========================================
-    # PAYMENT FORMAT
-    # Example:to Jane Smith 12845
-    # ========================================
-
-    payment_match = re.search(
-        r'to\s+([A-Za-z\s]+)\s+\d{5}',
-        body
-    )
-
+    payment_match = re.search(r'to\s+([A-Za-z\s]+)\s+\d{5}', body)
     if payment_match:
-
         receiver["name"] = payment_match.group(1).strip()
-
         receiver["identifier"] = extract_identifier(body)
-
         return receiver
 
-    # ========================================
-    # MERCHANT FORMAT
-    # Example: by DIRECT PAYMENT LTD
-    # ========================================
-
-    merchant_match = re.search(
-        r'by\s+([A-Za-z\s]+)',
-        body
-    )
-
+    merchant_match = re.search(r'by\s+([A-Za-z\s]+)', body)
     if merchant_match:
-
         receiver["name"] = merchant_match.group(1).strip()
-
-        receiver["identifier"] = {
-            "type": "merchant",
-            "value": "MERCHANT"
-        }
-
+        receiver["identifier"] = {"type": "merchant", "value": "MERCHANT"}
         return receiver
 
     return receiver
 
 
-# ============================================
-# MAIN FUNCTION:
-# LOAD AND PARSE TRANSACTIONS
-# ============================================
+# ---------- Main parsing function ----------
 
-def load_transactions():
-
+def load_transactions(xml_path=None):
     """
-    Reads the xml file, extracts important values, cleans and structures data, and stores them inside a dictionary.
-    Each transaction is a value of unique interger keys, that will help in hash map lookups
-
+    Parse the XML file and return a dictionary of transactions keyed by
+    a sequential transaction_id (1, 2, 3, ...).
+    If no path is given, uses the default project location.
     """
+    if xml_path is None:
+        xml_path = DEFAULT_XML_PATH
 
-    # Load XML file
-    tree = ET.parse("../data/raw/modified_sms_v2.xml")
-
-    # Get root <smses> element
+    tree = ET.parse(xml_path)
     root = tree.getroot()
 
-    # Dictionary storage
     transactions = {}
-
-    # Auto increment transaction ID
     transaction_id = 1
 
-    # Loop through every SMS
     for sms in root.findall("sms"):
-
-        # Get raw SMS body
         body = sms.get("body")
 
-        # Extract amount
-        amount = extract_money(
-            r'(\d[\d,]*)\sRWF',
-            body
-        )
-
-        # Extract fee
-        fee = extract_money(
-            r'Fee was[: ]\s*(\d[\d,]*)\sRWF',
-            body
-        )
-
-        # Extract new balance
+        amount = extract_money(r'(\d[\d,]*)\sRWF', body)
+        fee = extract_money(r'Fee was[: ]\s*(\d[\d,]*)\sRWF', body)
         new_balance = extract_money(
-            r'(?:new balance|NEW BALANCE)\s*[: ]+\s*(\d[\d,]*)\sRWF',
-            body
+            r'(?:new balance|NEW BALANCE)\s*[: ]+\s*(\d[\d,]*)\sRWF', body
         )
 
-        # Detect transaction category
         category = detect_category(body)
-
-        # Extract sender
         sender = extract_sender(body)
-
-        # Extract receiver
         receiver = extract_receiver(body)
-
-        # Convert timestamp
-        occurred_at = format_timestamp(
-            sms.get("date")
-        )
-
-        # Extract financial transaction ID
+        occurred_at = format_timestamp(sms.get("date"))
         financial_id = extract_financial_id(body)
 
-        # ====================================
-        # CREATE CLEAN TRANSACTION OBJECT
-        # ====================================
-
         transaction = {
-
-            # Internal system transaction ID
             "transaction_id": transaction_id,
-
-            # Financial transaction ID from SMS
             "financial_id": financial_id,
-
-            # Transaction date
             "occurred_at": occurred_at,
-
-            # Numeric values
             "amount": amount,
             "fee": fee,
             "new_balance": new_balance,
-
-            # Transaction category
             "category": category,
-
-            # Sender details
             "sender": sender,
-
-            # Receiver details
             "receiver": receiver,
-
-            # Original SMS body
             "body_raw": body,
-
-            # Logs help debugging and monitoring
             "log": {
                 "level": "INFO",
                 "message": "Transaction parsed successfully.",
-                "timestamp": occurred_at
+                "timestamp": occurred_at,
             },
-
-            # Boolean value
-            "is_processed": True
+            "is_processed": True,
         }
 
-        # Store transaction inside dictionary
-        # using transaction_id as key
         transactions[transaction_id] = transaction
-
-        # Increase transaction ID
         transaction_id += 1
 
     return transactions
 
 
-# ============================================
-# EXPORT TRANSACTIONS TO JSON FILE
-# ============================================
+def export_to_json(transactions, output_path=None):
+    """Write the parsed transactions out to a JSON file."""
+    if output_path is None:
+        output_path = DEFAULT_JSON_OUTPUT
 
-def export_to_json(transactions):
-
-    """
-    Export parsed transactions into a real JSON file.
-    Indent=4 makes the JSON easy for humans to read.
-    """
-
-    with open("parsed_transactions.json", "w") as json_file:
-
-        json.dump(
-            transactions,
-            json_file,
-            indent=4
-        )
+    with open(output_path, "w") as f:
+        json.dump(transactions, f, indent=4)
 
 
-# ============================================
-# RUN THE PARSER
-# ============================================
+# ---------- Run as a script ----------
 
-# Parse all transactions
-transactions = load_transactions()
-
-# Export transactions into JSON
-export_to_json(transactions)
-
-# Print formatted JSON in terminal
-print(
-    json.dumps(
-        transactions,
-        indent=4
-    )
-)
+if __name__ == "__main__":
+    transactions = load_transactions()
+    export_to_json(transactions)
+    print(json.dumps(transactions, indent=4))
+    print(f"\nParsed {len(transactions)} transactions.")
+    print(f"Saved to: {DEFAULT_JSON_OUTPUT}")

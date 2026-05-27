@@ -9,9 +9,9 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Transaction_Categories comes first because Transactions depends on it
 CREATE TABLE IF NOT EXISTS Transaction_Categories (
     category_id   INT          NOT NULL AUTO_INCREMENT COMMENT 'category primary key',
-    name          VARCHAR(50)  NOT NULL                COMMENT 'e.g. MoMo to MoMo Transfer, Agent Payment',
-    type          VARCHAR(50)  NOT NULL                COMMENT 'debit or credit',
-    direction     VARCHAR(3)   NOT NULL                COMMENT 'IN or OUT',
+    name          VARCHAR(50)  NOT NULL                COMMENT 'e.g. Incoming Payment and Transfer Out **',
+    type          VARCHAR(50)  NOT NULL                COMMENT 'debit or credit **',
+    direction     VARCHAR(3)   NOT NULL                COMMENT 'IN or OUT **',
 
     CONSTRAINT pk_category   PRIMARY KEY (category_id),
     CONSTRAINT chk_direction CHECK (direction IN ('IN', 'OUT')),
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS System_Logs (
     CONSTRAINT fk_log_txn    FOREIGN KEY (transaction_id) REFERENCES Transactions(transaction_id)
                              ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT chk_log_level CHECK (level IN ('INFO', 'WARN', 'ERROR'))
-);
+);  
 
 
 -- added user_id FK to link each message to the user it came from

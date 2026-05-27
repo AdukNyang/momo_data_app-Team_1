@@ -1,0 +1,422 @@
+openapi: 3.0.3
+
+info:
+  title: MoMo SMS Transactions API
+  description: |
+    A REST API for managing mobile money (MoMo) SMS transactions parsed from XML data.
+    Built with plain Python (`http.server`) — no web framework.
+
+    **Authentication:** All endpoints require HTTP Basic Authentication.
+    Use the "Authorize" button at the top to enter your credentials.
+
+    Default test credentials: `admin` / `password`
+  version: "1.0.0"
+  contact:
+    name: MoMo Data Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+# ---------- Auth applied globally ----------
+security:
+  - basicAuth: []
+
+# ---------- Tags for grouping endpoints in Swagger UI ----------
+tags:
+  - name: Transactions
+    description: CRUD operations on SMS transactions
+
+# ---------- Endpoint definitions ----------
+paths:
+
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: List all transactions
+      description: Returns every transaction currently in the system.
+      responses:
+        '200':
+          description: A list of transactions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+              example:
+                - transaction_id: 1
+                  financial_id: "76662021700"
+                  occurred_at: "2024-05-10 16:30:51"
+                  amount: 2000.0
+                  fee: 0.0
+                  new_balance: 2000.0
+                  category:
+                    name: Incoming Money
+                    type: credit
+                    direction: IN
+                  sender:
+                    name: Jane Smith
+                    identifier:
+                      type: phone
+                      value: "*********013"
+                  receiver:
+                    name: null
+                    identifier:
+                      type: null
+                      value: null
+                  body_raw: "You have received 2000 RWF from Jane Smith..."
+                  log:
+                    level: INFO
+                    message: Transaction parsed successfully.
+                    timestamp: "2024-05-10 16:30:51"
+                  is_processed: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Transactions]
+      summary: Create a new transaction
+      description: |
+        Adds a new transaction. Only the four essential fields
+        (`amount`, `category`, `sender`, `receiver`) are required —
+        the server fills in the rest.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreate'
+            example:
+              amount: 5000
+              category: Money Transfer
+              sender: John Doe
+              receiver: Jane Smith
+      responses:
+        '201':
+          description: Transaction created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Missing or invalid fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    error: "Missing required fields: category, sender, receiver"
+                invalid_json:
+                  summary: Body not valid JSON
+                  value:
+                    error: "Request body must be valid JSON"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transactions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TransactionId'
+
+    get:
+      tags: [Transactions]
+      summary: Get one transaction by ID
+      responses:
+        '200':
+          description: The transaction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Invalid transaction ID format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Invalid transaction id
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Transactions]
+      summary: Update a transaction
+      description: |
+        Partially updates a transaction. Only the fields you include in the body
+        will be changed — everything else stays the same.
+        The `transaction_id` cannot be changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              amount: 9999
+      responses:
+        '200':
+          description: Transaction updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Invalid request body or transaction ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Transactions]
+      summary: Delete a transaction
+      responses:
+        '200':
+          description: Transaction deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Transaction 1 deleted
+        '400':
+          description: Invalid transaction ID format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ---------- Reusable components ----------
+components:
+
+  # Reusable Basic Auth scheme
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Authentication. Sent as `Authorization Basic base64(user:pass)`.
+
+  # Reusable URL parameters
+  parameters:
+    TransactionId:
+      name: id
+      in: path
+      required: true
+      description: The transaction's unique numeric ID.
+      schema:
+        type: integer
+        minimum: 1
+        example: 1
+
+  # Reusable responses
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing:
+              summary: No credentials sent
+              value:
+                error: Authorization required
+            wrong:
+              summary: Wrong username or password
+              value:
+                error: Invalid credentials
+
+    NotFound:
+      description: Transaction not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Transaction 99999 not found
+
+  # Reusable schemas
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable description of what went wrong.
+      required: [error]
+
+    Identifier:
+      type: object
+      description: A sender or receiver identifier (phone, account, momo code).
+      properties:
+        type:
+          type: string
+          nullable: true
+          enum: [phone, account_number, momo_code, merchant, unknown, null]
+          example: phone
+        value:
+          type: string
+          nullable: true
+          example: "*********013"
+
+    Party:
+      type: object
+      description: A sender or receiver in a transaction.
+      properties:
+        name:
+          type: string
+          nullable: true
+          example: Jane Smith
+        identifier:
+          $ref: '#/components/schemas/Identifier'
+
+    Category:
+      type: object
+      description: The classification of the transaction.
+      properties:
+        name:
+          type: string
+          example: Incoming Money
+        type:
+          type: string
+          enum: [credit, debit, unknown]
+          example: credit
+        direction:
+          type: string
+          enum: [IN, OUT, UNK]
+          example: IN
+
+    Log:
+      type: object
+      description: Internal processing log for the transaction.
+      properties:
+        level:
+          type: string
+          example: INFO
+        message:
+          type: string
+          example: Transaction parsed successfully.
+        timestamp:
+          type: string
+          example: "2024-05-10 16:30:51"
+
+    Transaction:
+      type: object
+      description: A full transaction record as stored in the system.
+      properties:
+        transaction_id:
+          type: integer
+          example: 1
+        financial_id:
+          type: string
+          nullable: true
+          example: "76662021700"
+        occurred_at:
+          type: string
+          example: "2024-05-10 16:30:51"
+        amount:
+          type: number
+          example: 2000.0
+        fee:
+          type: number
+          example: 0.0
+        new_balance:
+          type: number
+          example: 2000.0
+        category:
+          $ref: '#/components/schemas/Category'
+        sender:
+          $ref: '#/components/schemas/Party'
+        receiver:
+          $ref: '#/components/schemas/Party'
+        body_raw:
+          type: string
+          example: "You have received 2000 RWF from Jane Smith..."
+        log:
+          $ref: '#/components/schemas/Log'
+        is_processed:
+          type: boolean
+          example: true
+      required:
+        - transaction_id
+        - amount
+        - category
+        - sender
+        - receiver
+
+    TransactionCreate:
+      type: object
+      description: The minimum payload for creating a transaction.
+      properties:
+        amount:
+          type: number
+          description: Transaction amount in RWF.
+          example: 5000
+        category:
+          type: string
+          description: Category label, e.g. "Money Transfer", "Incoming Money".
+          example: Money Transfer
+        sender:
+          type: string
+          description: Sender's name.
+          example: John Doe
+        receiver:
+          type: string
+          description: Receiver's name.
+          example: Jane Smith
+        financial_id:
+          type: string
+          nullable: true
+          description: Optional — original transaction ID from the SMS.
+        occurred_at:
+          type: string
+          nullable: true
+          description: Optional — when the transaction happened. Defaults to now.
+        fee:
+          type: number
+          nullable: true
+          description: Optional fee charged.
+        new_balance:
+          type: number
+          nullable: true
+          description: Optional account balance after this transaction.
+        body_raw:
+          type: string
+          nullable: true
+          description: Optional original SMS text.
+      required:
+        - amount
+        - category
+        - sender
+        - receiver
