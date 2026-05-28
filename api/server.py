@@ -18,11 +18,24 @@ or:
 """
 
 import json
+import base64
 import sys
 import os
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+# ------------- Credentials ------------
+VALID_USERNAME = "admin"
+VALID_PASSWORD = "password123"
+
+def check_auth(handler):
+    auth_header = handler.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Basic "):
+        return False
+    encoded = auth_header.split(" ")[1]
+    decoded = base64.b64decode(encoded).decode("utf-8")
+    username, password = decoded.split(":", 1)
+    return username == VALID_USERNAME and password == VALID_PASSWORD
 
 # ---------- Make the parser importable from anywhere ----------
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))   # .../api
@@ -127,6 +140,11 @@ class TransactionHandler(BaseHTTPRequestHandler):
     # ----- GET -----
 
     def do_GET(self):
+        if not check_auth(self):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="MOMO API"')
+            self.end_headers()
+            return
         if self.path == "/transactions":
             self.send_json(200, list(transactions.values()))
             return
@@ -147,6 +165,11 @@ class TransactionHandler(BaseHTTPRequestHandler):
     # ----- POST -----
 
     def do_POST(self):
+        if not check_auth(self):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="MOMO API"')
+            self.end_headers()
+            return
         if self.path != "/transactions":
             self.send_json(404, {"error": "Route not found"})
             return
@@ -176,6 +199,11 @@ class TransactionHandler(BaseHTTPRequestHandler):
     # ----- PUT -----
 
     def do_PUT(self):
+        if not check_auth(self):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="MOMO API"')
+            self.end_headers()
+            return
         if not self.path.startswith("/transactions/"):
             self.send_json(404, {"error": "Route not found"})
             return
@@ -203,6 +231,11 @@ class TransactionHandler(BaseHTTPRequestHandler):
     # ----- DELETE -----
 
     def do_DELETE(self):
+        if not check_auth(self):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="MOMO API"')
+            self.end_headers()
+            return
         if not self.path.startswith("/transactions/"):
             self.send_json(404, {"error": "Route not found"})
             return
