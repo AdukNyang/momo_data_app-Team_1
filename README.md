@@ -42,16 +42,28 @@ momo_data_app-Team_1/
 ├── .gitignore
 ├── requirements.txt
 ├── index.html
+├── api/
+│   └── server.py
 ├── data/
 │   ├── raw/
-│   │   └── momo.xml
-│   └── processed/
-│       └── dashboard.json
-├── Docs/
-│   └── MOMo SMS Database ERD.png
+│   │   └── .gitkeep
+│   ├── processed/
+│   │   └── dashboard.json
+│   └── logs/
+│       ├── etl.log
+│       └── dead_letter/
+├── database/
+│   └── database_setup.sql
+├── docs/
+│   ├── api_docs.md
+│   ├── openapi.yaml
+│   ├── System Architecture.png
+│   ├── MoMo SMS Database ERD.png
 │   └── MoMo_SMS_Database_Design_Document.pdf
-│   └── Picture_Evidence.jpeg
-│   └── System Architecture.png
+├── dsa/
+│   ├── xml_parser.py
+│   ├── search.py
+│   └── benchmark.py
 ├── etl/
 │   ├── __init__.py
 │   ├── config.py
@@ -61,7 +73,14 @@ momo_data_app-Team_1/
 │   ├── load_db.py
 │   └── run.py
 ├── examples/
-│   └── json_schemas.json
+│   ├── json_schemas.json
+│   └── mapping.md
+├── screenshots/
+│   ├── get_authorized.png
+│   ├── get_unauthorized.png
+│   ├── post_transaction.png
+│   ├── put_transaction.png
+│   └── delete_transaction.png
 ├── scripts/
 │   ├── run_etl.sh
 │   ├── export_json.sh
@@ -82,7 +101,7 @@ We are using Trello as our Scrum board to plan tasks, track progress, and collab
 🔗 **Trello Scrum Board:** [Team Setup and Project Planning](https://trello.com/invite/b/69ff6ce284203e6123d4f091/ATTI16bb612672418866183c0c05bd24307d71C13F25/team-setup-and-project-planning)
 
 ## Current Status
-We have completed Week 1 setup and Week 2 database design. So far we have:
+We have completed Week 1 setup, Week 2 database design, and Week 3 API implementation. So far we have:
 
 - Created the team GitHub repository and added all members as collaborators
 - Organized the project folder structure
@@ -93,9 +112,27 @@ We have completed Week 1 setup and Week 2 database design. So far we have:
 - Implemented the schema in MySQL with foreign keys, CHECK constraints, indexes, and column comments
 - Tested the schema with a full CRUD cycle on the Users table (results documented in the Database Design Document)
 - Modeled the schema as JSON for the future dashboard API, including a nested "completed transaction" example
+- Built a REST API in plain Python with full CRUD endpoints for transactions
+- Secured all endpoints with Basic Authentication (returns 401 for invalid credentials)
+- Implemented and compared Linear Search and Dictionary Lookup for transaction retrieval
+- Tested all endpoints with curl and documented results with screenshots
 
-## Next Steps
-- Build the Python ETL pipeline to parse, clean, categorize, and load `momo.xml` into the database
-- Add unit tests for the ETL modules
-- Expose the data via a small FastAPI layer
-- Build the dashboard frontend with Chart.js to visualize transaction totals, trends, and category breakdowns
+## How to Run the API
+
+1. Make sure Python is installed
+2. Place `modified_sms_v2.xml` in the `data/raw/` folder
+3. Run the server from the project root:
+
+```bash
+python api/server.py
+```
+
+4. The server starts at `http://localhost:8000`
+5. All endpoints require Basic Authentication:
+   - Username: `admin`
+   - Password: `password123`
+
+Example request:
+```bash
+curl -u admin:password123 http://localhost:8000/transactions
+```
