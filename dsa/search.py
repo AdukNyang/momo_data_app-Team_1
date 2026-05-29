@@ -15,7 +15,9 @@ def linear_search(transactions, target_id):
     return None
 
 def format_result(target_id: int, result) -> str:
-    """Turn a search result into a one-line human-readable string."""
+    """
+    Turn a search result into a one-line human-readable string
+    """
     if result is None:
         return f"id={target_id}: not found"
     return (
@@ -25,7 +27,9 @@ def format_result(target_id: int, result) -> str:
     )
 
 def interactive_loop(transactions: list) -> None:
-    """Prompt the user for IDs until they quit."""
+    """
+    Prompt the user for IDs until they quit
+    """
     print("Enter a transaction ID to search (or 'q' to quit).")
     while True:
         try:
@@ -42,3 +46,18 @@ def interactive_loop(transactions: list) -> None:
             continue
         print(format_result(target_id, linear_search(transactions, target_id)))
 
+if __name__ == "__main__":
+    transactions_list = list(load_transactions().values())
+    print(f"Loaded {len(transactions_list)} transactions.\n")
+
+    if len(sys.argv) < 2:
+        # No ID given — drop into interactive mode
+        interactive_loop(transactions_list)
+    else:
+        # ID given on command line — one-shot search
+        try:
+            target_id = int(sys.argv[1])
+        except ValueError:
+            print(f"Error: '{sys.argv[1]}' is not a valid id.")
+            sys.exit(1)
+        print(format_result(target_id, linear_search(transactions_list, target_id)))
