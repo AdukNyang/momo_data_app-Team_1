@@ -80,7 +80,8 @@ momo_data_app-Team_1/
 │   ├── get_unauthorized.png
 │   ├── post_transaction.png
 │   ├── put_transaction.png
-│   └── delete_transaction.png
+│   ├── delete_transaction.png
+│   └── dsa_linear&dddict_lookup.png
 ├── scripts/
 │   ├── run_etl.sh
 │   ├── export_json.sh
