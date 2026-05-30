@@ -136,3 +136,95 @@ Example request:
 ```bash
 curl -u admin:password123 http://localhost:8000/transactions
 ```
+
+---
+
+## DSA Integration — Search Algorithms
+
+The `dsa/` folder contains two search algorithm implementations for looking up transactions by ID, along with a benchmark to compare their efficiency.
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `dsa/xml_parser.py` | Parses `modified_sms_v2.xml` and returns transactions as a dict and a list |
+| `dsa/search.py` | Implements linear search and dictionary lookup |
+| `dsa/benchmark.py` | Benchmarks both methods across 26 IDs × 100 repeats |
+
+### How to Run
+
+Navigate to the `dsa/` folder first:
+
+```bash
+cd dsa
+```
+
+**One-shot search (command line):**
+
+```bash
+# Default — linear search for transaction ID 25
+python search.py 25
+
+# Explicit linear search
+python search.py 25 linear
+
+# Dictionary lookup
+python search.py 25 dict
+```
+
+**Interactive mode (no arguments):**
+
+```bash
+python search.py
+```
+Prompts you to choose a method, then lets you search by ID repeatedly until you type `q`.
+
+**Benchmark:**
+
+```bash
+python benchmark.py
+```
+
+### Benchmark Results
+
+Tested on 1,691 transactions, 26 IDs, 100 repeats each:
+
+| Method | Total Time |
+|--------|-----------|
+| Linear search | 0.033485 seconds |
+| Dictionary lookup | 0.000107 seconds |
+
+**Dict lookup is 311.5× faster than linear search.**
+
+### Why is Dictionary Lookup Faster?
+
+Linear search scans every transaction one by one until it finds a match — O(n) time. With 1,691 records, that means up to 1,691 comparisons per lookup.
+
+Dictionary lookup uses a hash table under the hood. Python computes a hash of the key and jumps directly to the right slot — O(1) average time, regardless of how many records exist.
+
+### Possible Improvements
+
+- **Binary search** on a sorted list — O(log n), faster than linear but still slower than a hash map
+- **B-tree index** (as used in MySQL) — efficient for range queries like "all transactions between two dates"
+- **Trie** — useful if searching by string prefixes (e.g. partial financial IDs)
+
+### Test Evidence
+
+Screenshots of all four test commands are saved in `screenshots/dsa_linear&dddict_lookup.png`.
+
+---
+
+## API Documentation
+
+Full endpoint documentation (request/response examples, error codes, authentication details) is in [`docs/api_docs.md`](docs/api_docs.md).
+
+---
+
+## Authentication & Security Note
+
+The API uses HTTP Basic Authentication. While functional for development and learning, Basic Auth has known limitations:
+- Credentials are only base64-encoded, not encrypted
+- Sent on every request, increasing exposure risk
+- No token expiry or revocation mechanism
+
+**Stronger alternatives:** JWT (JSON Web Tokens) for stateless auth with expiry, or OAuth 2.0 for delegated access with scopes. See the project report for a full discussion.
